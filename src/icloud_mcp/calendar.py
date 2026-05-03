@@ -277,7 +277,8 @@ async def create_event(
     description: Optional[str] = None,
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
-    calendar_id: Optional[str] = None
+    calendar_id: Optional[str] = None,
+    recurrence: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Create a new calendar event.
@@ -290,6 +291,7 @@ async def create_event(
         location: Event location (optional)
         attendees: List of attendee email addresses to invite (optional)
         calendar_id: Target calendar URL/ID (optional, defaults to first non-reminder calendar)
+        recurrence: iCal RRULE string for recurring events (e.g. "RRULE:FREQ=YEARLY" for annual events)
 
     Returns:
         Created event details
@@ -307,9 +309,10 @@ async def create_event(
             raise ValueError("No calendars found")
 
         # Filter out reminder/task calendars - they don't support VEVENT
+        REMINDER_KEYWORDS = ('⚠', 'reminder', 'promemoria', 'reminders')
         event_calendars = [
             cal for cal in all_calendars
-            if cal.name and '⚠' not in cal.name and 'reminder' not in cal.name.lower()
+            if cal.name and not any(kw in cal.name.lower() for kw in REMINDER_KEYWORDS)
         ]
 
         if not event_calendars:
@@ -339,6 +342,11 @@ SUMMARY:{summary}
 STATUS:CONFIRMED
 SEQUENCE:0
 """
+
+    if recurrence:
+        # Support both "RRULE:FREQ=YEARLY" and bare "FREQ=YEARLY"
+        rrule = recurrence if recurrence.startswith("RRULE:") else f"RRULE:{recurrence}"
+        ical_data += f"{rrule}\n"
 
     if description:
         # Escape special characters in description
